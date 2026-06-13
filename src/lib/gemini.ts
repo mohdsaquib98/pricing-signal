@@ -106,7 +106,18 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  const parsed = JSON.parse(text)
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    // If JSON parsing fails, try to extract JSON from text response
+    const jsonMatch = text.match(/\{[^}]+\}/)
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0])
+    } else {
+      throw new Error(`Invalid JSON response from Gemini: ${text.substring(0, 100)}...`)
+    }
+  }
 
   // Safety check: never allow recommendation below margin floor
   if (parsed.recommendedPrice < item.data.marginFloor) {
