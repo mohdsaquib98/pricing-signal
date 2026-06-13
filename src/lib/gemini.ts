@@ -106,25 +106,29 @@ export async function getRecommendation(
   }
 
   // Extract JSON from response (handles plain JSON, markdown code blocks, or mixed text)
-  function extractJSON(text: string): any {
-    // Remove markdown code blocks if present
-    let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '')
-    
-    // Try direct parse first
+  function extractJSON(raw: string): any {
+    // Strip markdown code fences
+    const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
+
+    // Try direct parse
     try {
-      return JSON.parse(cleanText)
+      return JSON.parse(cleaned)
     } catch {
-      // Extract JSON object from text
-      const match = cleanText.match(/\{[^{}]*"recommendedPrice"[^{}]*\}/s)
-      if (match) {
-        try {
-          return JSON.parse(match[0])
-        } catch {
-          return null
-        }
-      }
-      return null
+      // no-op
     }
+
+    // Try to find JSON object in the text by locating first { and last }
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1))
+      } catch {
+        // no-op
+      }
+    }
+
+    return null
   }
 
   const parsed = extractJSON(text)
