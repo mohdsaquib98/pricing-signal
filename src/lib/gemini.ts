@@ -105,53 +105,48 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  // Try to parse as JSON first
-  let parsed: any = null
-  
-  try {
-    // Try direct JSON parse
-    parsed = JSON.parse(text)
-  } catch {
-    // Try to extract JSON from markdown code blocks or text
-    const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/) || text.match(/\{[\s\S]*"recommendedPrice"[\s\S]*?\}/)
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[1] || jsonMatch[0])
-      } catch {
-        // JSON extraction failed, will fall back to text parsing
+  // Extract JSON from response (handles plain JSON, markdown code blocks, or mixed text)
+  function extractJSON(text: string): any {
+    // Remove markdown code blocks if present
+    let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+    
+    // Try direct parse first
+    try {
+      return JSON.parse(cleanText)
+    } catch {
+      // Extract JSON object from text
+      const match = cleanText.match(/\{[^{}]*"recommendedPrice"[^{}]*\}/s)
+      if (match) {
+        try {
+          return JSON.parse(match[0])
+        } catch {
+          return null
+        }
       }
+      return null
     }
   }
 
+  const parsed = extractJSON(text)
+
+  // Validate and extract data
   let recommendedPrice: number
   let reasoning: string
   let marginImpact: string
 
   if (parsed && typeof parsed.recommendedPrice === 'number') {
-    // Successfully parsed JSON
     recommendedPrice = parsed.recommendedPrice
-    reasoning = parsed.reasoning || 'No reasoning provided'
+    reasoning = parsed.reasoning || text
     marginImpact = parsed.marginImpact || 'N/A'
   } else {
-    // Fallback: extract from text
-    recommendedPrice = item.data.ourPrice
-    reasoning = text.substring(0, 200)
-    marginImpact = 'N/A'
-    
-    // Try to extract price from text (supports decimals)
-    const priceMatch = text.match(/₹(\d+(?:,\d+)*(?:\.\d+)?)/g)
-    if (priceMatch && priceMatch.length > 0) {
-      const price = parseFloat(priceMatch[0].replace('₹', '').replace(/,/g, ''))
-      if (!isNaN(price) && price >= item.data.marginFloor) {
-        recommendedPrice = price
-      }
-    }
+    // Fallback if JSON parsing completely fails
+    throw new Error(`Invalid response format from Gemini API. Expected JSON with recommendedPrice. Got: ${text.substring(0, 100)}`)
   }
 
   // Safety check: never allow recommendation below margin floor
   if (recommendedPrice < item.data.marginFloor) {
     recommendedPrice = item.data.marginFloor
-    reasoning = `[Safety Override] Set to margin floor ₹${item.data.marginFloor}. ${reasoning}`
+    reasoning = `[Safety Override] Original recommendation was below margin floor. Set to ₹${item.data.marginFloor}. ${reasoning}`
   }
 
   return {
