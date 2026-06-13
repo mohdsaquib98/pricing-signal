@@ -113,10 +113,10 @@ export async function getRecommendation(
     parsed = JSON.parse(text)
   } catch {
     // Try to extract JSON from markdown code blocks or text
-    const jsonMatch = text.match(/\{[\s\S]*"recommendedPrice"[\s\S]*\}/)
+    const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/) || text.match(/\{[\s\S]*"recommendedPrice"[\s\S]*?\}/)
     if (jsonMatch) {
       try {
-        parsed = JSON.parse(jsonMatch[0])
+        parsed = JSON.parse(jsonMatch[1] || jsonMatch[0])
       } catch {
         // JSON extraction failed, will fall back to text parsing
       }
@@ -130,7 +130,7 @@ export async function getRecommendation(
   if (parsed && typeof parsed.recommendedPrice === 'number') {
     // Successfully parsed JSON
     recommendedPrice = parsed.recommendedPrice
-    reasoning = parsed.reasoning || text.substring(0, 200)
+    reasoning = parsed.reasoning || 'No reasoning provided'
     marginImpact = parsed.marginImpact || 'N/A'
   } else {
     // Fallback: extract from text
@@ -138,10 +138,10 @@ export async function getRecommendation(
     reasoning = text.substring(0, 200)
     marginImpact = 'N/A'
     
-    // Try to extract price from text
-    const priceMatch = text.match(/₹(\d+(?:,\d+)*)/g)
+    // Try to extract price from text (supports decimals)
+    const priceMatch = text.match(/₹(\d+(?:,\d+)*(?:\.\d+)?)/g)
     if (priceMatch && priceMatch.length > 0) {
-      const price = parseInt(priceMatch[0].replace('₹', '').replace(/,/g, ''))
+      const price = parseFloat(priceMatch[0].replace('₹', '').replace(/,/g, ''))
       if (!isNaN(price) && price >= item.data.marginFloor) {
         recommendedPrice = price
       }
