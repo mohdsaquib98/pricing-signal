@@ -105,58 +105,37 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  // Extract JSON from response (handles plain JSON, markdown code blocks, or mixed text)
-  function extractJSON(raw: string): any {
-    // Strip markdown code fences
-    const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
-
-    // Try direct parse
-    try {
-      return JSON.parse(cleaned)
-    } catch {
-      // no-op
+  // Extract price from text - look for numbers after ₹ symbol or standalone numbers
+  let recommendedPrice = item.data.ourPrice // default to current price
+  
+  // Try to find price in format ₹1,234 or ₹1234
+  const priceMatches = text.match(/₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/g)
+  if (priceMatches && priceMatches.length > 0) {
+    // Take the first price mentioned
+    const firstPrice = parseFloat(priceMatches[0].replace(/₹|,|\s/g, ''))
+    if (!isNaN(firstPrice) && firstPrice >= item.data.marginFloor) {
+      recommendedPrice = firstPrice
     }
-
-    // Try to find JSON object in the text by locating first { and last }
-    const start = cleaned.indexOf('{')
-    const end = cleaned.lastIndexOf('}')
-    if (start !== -1 && end > start) {
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1))
-      } catch {
-        // no-op
-      }
-    }
-
-    return null
   }
 
-  const parsed = extractJSON(text)
-
-  // Validate and extract data
-  let recommendedPrice: number
-  let reasoning: string
-  let marginImpact: string
-
-  if (parsed && typeof parsed.recommendedPrice === 'number') {
-    recommendedPrice = parsed.recommendedPrice
-    reasoning = parsed.reasoning || text
-    marginImpact = parsed.marginImpact || 'N/A'
-  } else {
-    // Fallback if JSON parsing completely fails
-    throw new Error(`Invalid response format from Gemini API. Expected JSON with recommendedPrice. Got: ${text.substring(0, 100)}`)
+  // Calculate margin impact
+  const priceDiff = recommendedPrice - item.data.ourPrice
+  let marginImpact = 'No change'
+  if (priceDiff > 0) {
+    marginImpact = `Margin increase: ₹${priceDiff}`
+  } else if (priceDiff < 0) {
+    marginImpact = `Margin decrease: ₹${Math.abs(priceDiff)}`
   }
 
   // Safety check: never allow recommendation below margin floor
   if (recommendedPrice < item.data.marginFloor) {
     recommendedPrice = item.data.marginFloor
-    reasoning = `[Safety Override] Original recommendation was below margin floor. Set to ₹${item.data.marginFloor}. ${reasoning}`
   }
 
   return {
     sku: item.data.sku,
     recommendedPrice,
-    reasoning,
+    reasoning: text,
     marginImpact,
   }
 }
