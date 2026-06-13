@@ -105,17 +105,46 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  // Parse text response to extract pricing recommendation
-  let recommendedPrice = item.data.ourPrice
-  let reasoning = text.substring(0, 200)
-  let marginImpact = 'N/A'
+  // Try to parse as JSON first
+  let parsed: any = null
   
-  // Try to extract price from text
-  const priceMatch = text.match(/₹(\d+(?:,\d+)*)/g)
-  if (priceMatch && priceMatch.length > 0) {
-    const price = parseInt(priceMatch[0].replace('₹', '').replace(',', ''))
-    if (price >= item.data.marginFloor) {
-      recommendedPrice = price
+  try {
+    // Try direct JSON parse
+    parsed = JSON.parse(text)
+  } catch {
+    // Try to extract JSON from markdown code blocks or text
+    const jsonMatch = text.match(/\{[\s\S]*"recommendedPrice"[\s\S]*\}/)
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0])
+      } catch {
+        // JSON extraction failed, will fall back to text parsing
+      }
+    }
+  }
+
+  let recommendedPrice: number
+  let reasoning: string
+  let marginImpact: string
+
+  if (parsed && typeof parsed.recommendedPrice === 'number') {
+    // Successfully parsed JSON
+    recommendedPrice = parsed.recommendedPrice
+    reasoning = parsed.reasoning || text.substring(0, 200)
+    marginImpact = parsed.marginImpact || 'N/A'
+  } else {
+    // Fallback: extract from text
+    recommendedPrice = item.data.ourPrice
+    reasoning = text.substring(0, 200)
+    marginImpact = 'N/A'
+    
+    // Try to extract price from text
+    const priceMatch = text.match(/₹(\d+(?:,\d+)*)/g)
+    if (priceMatch && priceMatch.length > 0) {
+      const price = parseInt(priceMatch[0].replace('₹', '').replace(/,/g, ''))
+      if (!isNaN(price) && price >= item.data.marginFloor) {
+        recommendedPrice = price
+      }
     }
   }
 
