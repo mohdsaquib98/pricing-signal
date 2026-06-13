@@ -89,7 +89,6 @@ export async function getRecommendation(
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 300,
-        responseMimeType: 'application/json',
       },
     }),
   })
@@ -106,30 +105,31 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  let parsed
-  try {
-    parsed = JSON.parse(text)
-  } catch (error) {
-    // If JSON parsing fails, try to extract JSON from text response
-    const jsonMatch = text.match(/\{[^}]+\}/)
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0])
-    } else {
-      throw new Error(`Invalid JSON response from Gemini: ${text.substring(0, 100)}...`)
+  // Parse text response to extract pricing recommendation
+  let recommendedPrice = item.data.ourPrice
+  let reasoning = text.substring(0, 200)
+  let marginImpact = 'N/A'
+  
+  // Try to extract price from text
+  const priceMatch = text.match(/₹(\d+(?:,\d+)*)/g)
+  if (priceMatch && priceMatch.length > 0) {
+    const price = parseInt(priceMatch[0].replace('₹', '').replace(',', ''))
+    if (price >= item.data.marginFloor) {
+      recommendedPrice = price
     }
   }
 
   // Safety check: never allow recommendation below margin floor
-  if (parsed.recommendedPrice < item.data.marginFloor) {
-    parsed.recommendedPrice = item.data.marginFloor
-    parsed.reasoning = `[Safety Override] Original recommendation was below margin floor. Set to margin floor ₹${item.data.marginFloor}. ${parsed.reasoning}`
+  if (recommendedPrice < item.data.marginFloor) {
+    recommendedPrice = item.data.marginFloor
+    reasoning = `[Safety Override] Set to margin floor ₹${item.data.marginFloor}. ${reasoning}`
   }
 
   return {
     sku: item.data.sku,
-    recommendedPrice: parsed.recommendedPrice,
-    reasoning: parsed.reasoning,
-    marginImpact: parsed.marginImpact,
+    recommendedPrice,
+    reasoning,
+    marginImpact,
   }
 }
 
