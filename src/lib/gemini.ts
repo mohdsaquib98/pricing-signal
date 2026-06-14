@@ -1,6 +1,7 @@
 import type { CategorizedSKU } from './pricingEngine'
 
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions'
+// Use proxy endpoint for both development and production to avoid CORS
+const GROK_API_URL = '/api/grok'
 
 export interface PricingRecommendation {
   sku: string
@@ -96,10 +97,10 @@ export async function getRecommendation(
   const response = await fetch(GROK_API_URL, {
     method: 'POST',
     headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      apiKey,
       model: 'grok-beta',
       messages: [
         {
