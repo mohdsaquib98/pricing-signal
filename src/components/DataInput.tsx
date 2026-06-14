@@ -58,41 +58,14 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
     })
   }
 
-  const handleParseData = () => {
+  const handleParseCSV = () => {
     try {
       setError('')
-      let parsed: SKUData[]
-      
-      // Try CSV first (if contains comma-separated values)
-      if (rawInput.includes(',') && rawInput.split('\n').length > 1) {
-        parsed = parseCSV(rawInput)
-      } else {
-        // Try JSON
-        const jsonData = JSON.parse(rawInput)
-        if (!Array.isArray(jsonData)) {
-          setError('Input must be a JSON array or CSV with headers.')
-          return
-        }
-        parsed = jsonData.map((item: Record<string, unknown>) => {
-          if (!item.sku || item.ourPrice === undefined || item.competitorPrice === undefined || item.marginFloor === undefined) {
-            throw new Error(`Missing required fields in item: ${JSON.stringify(item).slice(0, 80)}`)
-          }
-          return {
-            sku: String(item.sku),
-            brand: String(item.brand || 'Unknown'),
-            ourPrice: Number(item.ourPrice),
-            competitorPrice: Number(item.competitorPrice),
-            buyBoxStatus: (item.buyBoxStatus === 'Won' ? 'Won' : 'Lost') as 'Won' | 'Lost',
-            marginFloor: Number(item.marginFloor),
-            lastChanged: String(item.lastChanged || 'Unknown'),
-          }
-        })
-      }
-      
+      const parsed = parseCSV(rawInput)
       onDataLoaded(parsed)
       setShowInput(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid input format.')
+      setError(err instanceof Error ? err.message : 'Invalid CSV format.')
     }
   }
 
@@ -130,7 +103,7 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
             className="flex items-center gap-2 px-6 py-3 rounded-xl border border-border text-foreground font-medium hover:bg-gray-50 transition-colors"
           >
             <Upload className="w-4 h-4" />
-            Paste Custom JSON
+            Paste Custom CSV
           </button>
         </div>
       </div>
@@ -140,7 +113,7 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
   return (
     <div className="max-w-3xl mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Paste JSON or CSV Data</h2>
+        <h2 className="text-lg font-semibold text-foreground">Paste CSV Data</h2>
         <button onClick={() => setShowInput(false)} className="text-muted-foreground hover:text-foreground">
           <X className="w-5 h-5" />
         </button>
@@ -148,13 +121,13 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
       <textarea
         value={rawInput}
         onChange={e => setRawInput(e.target.value)}
-        placeholder={`Paste JSON array or CSV with headers:\nsku,brand,ourPrice,competitorPrice,buyBoxStatus,marginFloor,lastChanged\nSKU-001,Brand A,1299,1199,Lost,1050,3 days ago`}
+        placeholder={`Paste CSV with headers:\nsku,brand,ourPrice,competitorPrice,buyBoxStatus,marginFloor,lastChanged\nSKU-001,Brand A,1299,1199,Lost,1050,3 days ago`}
         className="w-full h-64 p-4 rounded-xl border border-border bg-white font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <div className="flex gap-3 mt-4">
         <button
-          onClick={handleParseData}
+          onClick={handleParseCSV}
           className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           Parse & Load
