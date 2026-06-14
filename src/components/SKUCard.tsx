@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { CategorizedSKU } from '@/lib/pricingEngine'
-import type { PricingRecommendation } from '@/lib/gemini'
+import type { PricingRecommendation } from '@/lib/groq'
 
 interface SKUCardProps {
   item: CategorizedSKU

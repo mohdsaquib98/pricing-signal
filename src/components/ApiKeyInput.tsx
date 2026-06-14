@@ -14,7 +14,7 @@ export function ApiKeyInput({ apiKey, onApiKeyChange }: ApiKeyInputProps) {
       <Key className="w-4 h-4 text-muted-foreground shrink-0" />
       <input
         type={show ? 'text' : 'password'}
-        placeholder="Enter Gemini API Key..."
+        placeholder="Enter Groq API Key..."
         value={apiKey}
         onChange={e => onApiKeyChange(e.target.value)}
         className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground min-w-0"
