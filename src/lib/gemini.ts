@@ -1,6 +1,6 @@
 import type { CategorizedSKU } from './pricingEngine'
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent'
+const GROK_API_URL = 'https://api.x.ai/v1/chat/completions'
 
 export interface PricingRecommendation {
   sku: string
@@ -93,29 +93,36 @@ export async function getRecommendation(
 ): Promise<PricingRecommendation> {
   const prompt = buildPrompt(item)
 
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GROK_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 300,
-        responseMimeType: 'application/json',
-      },
+      model: 'grok-beta',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 300,
+      response_format: { type: 'json_object' }
     }),
   })
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`)
+    throw new Error(`Grok API error: ${response.status} - ${errorText}`)
   }
 
   const result = await response.json()
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text
+  const text = result.choices?.[0]?.message?.content
 
   if (!text) {
-    throw new Error('No response from Gemini API')
+    throw new Error('No response from Grok API')
   }
 
   let recommendedPrice: number
