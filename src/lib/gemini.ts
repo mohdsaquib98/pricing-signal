@@ -1,7 +1,7 @@
 import type { CategorizedSKU } from './pricingEngine'
 
-// Use proxy endpoint for both development and production to avoid CORS
-const GROK_API_URL = '/api/grok'
+// Use Groq API endpoint
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 export interface PricingRecommendation {
   sku: string
@@ -94,14 +94,14 @@ export async function getRecommendation(
 ): Promise<PricingRecommendation> {
   const prompt = buildPrompt(item)
 
-  const response = await fetch(GROK_API_URL, {
+  const response = await fetch(GROQ_API_URL, {
     method: 'POST',
     headers: { 
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      apiKey,
-      model: 'grok-beta',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'user',
@@ -116,14 +116,14 @@ export async function getRecommendation(
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Grok API error: ${response.status} - ${errorText}`)
+    throw new Error(`Groq API error: ${response.status} - ${errorText}`)
   }
 
   const result = await response.json()
   const text = result.choices?.[0]?.message?.content
 
   if (!text) {
-    throw new Error('No response from Grok API')
+    throw new Error('No response from Groq API')
   }
 
   let recommendedPrice: number
