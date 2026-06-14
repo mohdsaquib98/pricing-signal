@@ -102,16 +102,31 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  // Extract price from text - look for numbers after ₹ symbol or standalone numbers
+  // Extract price from text - look for the recommended price specifically
   let recommendedPrice = item.data.ourPrice // default to current price
   
-  // Try to find price in format ₹1,234 or ₹1234
-  const priceMatches = text.match(/₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/g)
-  if (priceMatches && priceMatches.length > 0) {
-    // Take the first price mentioned
-    const firstPrice = parseFloat(priceMatches[0].replace(/₹|,|\s/g, ''))
-    if (!isNaN(firstPrice) && firstPrice >= item.data.marginFloor) {
-      recommendedPrice = firstPrice
+  // Look for patterns like "Recommend ₹1234", "suggest ₹1234", "price ₹1234"
+  const recommendMatch = text.match(/(?:recommend|suggest|price|set|change to)\s*(?:to\s*)?₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/i)
+  if (recommendMatch) {
+    const price = parseFloat(recommendMatch[1].replace(/,/g, ''))
+    if (!isNaN(price) && price >= item.data.marginFloor) {
+      recommendedPrice = price
+    }
+  } else {
+    // Fallback: look for any price that's different from current price and competitor price
+    const priceMatches = text.match(/₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/g)
+    if (priceMatches && priceMatches.length > 0) {
+      // Find a price that's not current price or competitor price
+      for (const match of priceMatches) {
+        const price = parseFloat(match.replace(/₹|,|\s/g, ''))
+        if (!isNaN(price) && 
+            price !== item.data.ourPrice && 
+            price !== item.data.competitorPrice &&
+            price >= item.data.marginFloor) {
+          recommendedPrice = price
+          break
+        }
+      }
     }
   }
 
