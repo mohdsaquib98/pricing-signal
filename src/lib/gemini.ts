@@ -28,7 +28,12 @@ The competitor is pricing at ₹${data.competitorPrice}, which is below our marg
 Provide a brief strategic recommendation for this situation. Do NOT recommend pricing below ₹${data.marginFloor}.
 Suggest alternative strategies (e.g., bundle offers, value positioning, wait for competitor price increase).
 
-If you recommend a price change, clearly state the new price with the ₹ symbol (e.g., "Recommend ₹1200").`
+Return a JSON object with these exact keys:
+{
+  "recommendedPrice": number (must be >= ${data.marginFloor}),
+  "reasoning": string (1-2 sentence explanation),
+  "marginImpact": string (1 sentence about margin trade-off)
+}`
   }
 
   if (category === 'immediate') {
@@ -48,7 +53,12 @@ RULES:
 3. Balance competitiveness with margin preservation
 4. Be specific with the exact price
 
-Recommend a specific price with the ₹ symbol (e.g., "Recommend ₹1185").`
+Return a JSON object with these exact keys:
+{
+  "recommendedPrice": number (must be >= ${data.marginFloor} and ideally < ${data.competitorPrice}),
+  "reasoning": string (1-2 sentence specific explanation with actual numbers),
+  "marginImpact": string (1 sentence about margin trade-off with numbers)
+}`
   }
 
   // Optimization
@@ -69,7 +79,12 @@ RULES:
 3. Maximize margin while keeping competitive edge
 4. Be specific with the exact price
 
-Recommend a specific price with the ₹ symbol (e.g., "Recommend ₹1350").`
+Return a JSON object with these exact keys:
+{
+  "recommendedPrice": number (must be >= ${data.marginFloor} and < ${data.competitorPrice}),
+  "reasoning": string (1-2 sentence specific explanation with actual numbers),
+  "marginImpact": string (1 sentence about margin improvement with numbers)
+}`
 }
 
 export async function getRecommendation(
@@ -86,6 +101,7 @@ export async function getRecommendation(
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 300,
+        responseMimeType: 'application/json',
       },
     }),
   })
@@ -102,52 +118,64 @@ export async function getRecommendation(
     throw new Error('No response from Gemini API')
   }
 
-  // Extract price from text - look for the recommended price specifically
-  let recommendedPrice = item.data.ourPrice // default to current price
-  
-  // Look for patterns like "Recommend ₹1234", "suggest ₹1234", "price ₹1234"
-  const recommendMatch = text.match(/(?:recommend|suggest|price|set|change to)\s*(?:to\s*)?₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/i)
-  if (recommendMatch) {
-    const price = parseFloat(recommendMatch[1].replace(/,/g, ''))
-    if (!isNaN(price) && price >= item.data.marginFloor) {
-      recommendedPrice = price
+  let recommendedPrice: number
+  let reasoning: string
+  let marginImpact: string
+
+  // Try to parse as JSON first
+  try {
+    const parsed = JSON.parse(text)
+    if (typeof parsed.recommendedPrice === 'number') {
+      recommendedPrice = parsed.recommendedPrice
+      reasoning = parsed.reasoning || text
+      marginImpact = parsed.marginImpact || 'N/A'
+    } else {
+      throw new Error('Invalid JSON structure')
     }
-  } else {
-    // Fallback: look for any price that's different from current price and competitor price
+  } catch {
+    // Fallback to text extraction
+    recommendedPrice = item.data.ourPrice
+    
+    // Find all prices in the text
     const priceMatches = text.match(/₹\s*(\d+(?:,\d+)*(?:\.\d+)?)/g)
     if (priceMatches && priceMatches.length > 0) {
-      // Find a price that's not current price or competitor price
-      for (const match of priceMatches) {
-        const price = parseFloat(match.replace(/₹|,|\s/g, ''))
-        if (!isNaN(price) && 
-            price !== item.data.ourPrice && 
-            price !== item.data.competitorPrice &&
-            price >= item.data.marginFloor) {
-          recommendedPrice = price
-          break
-        }
+      // Convert to numbers and filter valid ones (above margin floor)
+      const validPrices = priceMatches
+        .map((match: string) => parseFloat(match.replace(/₹|,|\s/g, '')))
+        .filter((p: number) => !isNaN(p) && p >= item.data.marginFloor)
+      
+      // Take the last valid price (recommendations typically come at end)
+      if (validPrices.length > 0) {
+        recommendedPrice = validPrices[validPrices.length - 1]
       }
     }
+    
+    reasoning = text
+    marginImpact = 'N/A'
   }
 
-  // Calculate margin impact
-  const priceDiff = recommendedPrice - item.data.ourPrice
-  let marginImpact = 'No change'
-  if (priceDiff > 0) {
-    marginImpact = `Margin increase: ₹${priceDiff}`
-  } else if (priceDiff < 0) {
-    marginImpact = `Margin decrease: ₹${Math.abs(priceDiff)}`
+  // Calculate margin impact if not provided
+  if (marginImpact === 'N/A') {
+    const priceDiff = recommendedPrice - item.data.ourPrice
+    if (priceDiff > 0) {
+      marginImpact = `Margin increase: ₹${priceDiff}`
+    } else if (priceDiff < 0) {
+      marginImpact = `Margin decrease: ₹${Math.abs(priceDiff)}`
+    } else {
+      marginImpact = 'No change'
+    }
   }
 
   // Safety check: never allow recommendation below margin floor
   if (recommendedPrice < item.data.marginFloor) {
     recommendedPrice = item.data.marginFloor
+    reasoning = `[Safety Override] Set to margin floor ₹${item.data.marginFloor}. ${reasoning}`
   }
 
   return {
     sku: item.data.sku,
     recommendedPrice,
-    reasoning: text,
+    reasoning,
     marginImpact,
   }
 }

@@ -8,7 +8,15 @@ interface DataInputProps {
   hasData: boolean
 }
 
-const sampleJSON = JSON.stringify(sampleData, null, 2)
+const sampleCSV = `sku,brand,ourPrice,competitorPrice,buyBoxStatus,marginFloor,lastChanged
+SKU-001,Natura Casa,1299,1199,Lost,1050,3 days ago
+SKU-002,Natura Casa,849,860,Won,720,Today
+SKU-003,LivSpace Pro,2499,2199,Lost,1800,6 days ago
+SKU-004,LivSpace Pro,599,610,Won,480,2 days ago
+SKU-005,Artisan Home,3799,3750,Lost,3200,1 day ago
+SKU-006,Artisan Home,1150,1390,Won,900,Today
+SKU-007,Nordic Basics,449,399,Lost,420,5 days ago
+SKU-008,Nordic Basics,2199,2100,Lost,1750,4 days ago`
 
 export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
   const [showInput, setShowInput] = useState(false)
@@ -152,10 +160,10 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
           Parse & Load
         </button>
         <button
-          onClick={() => { setRawInput(sampleJSON) }}
+          onClick={() => { setRawInput(sampleCSV) }}
           className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-gray-50 transition-colors"
         >
-          Fill Sample JSON
+          Fill Sample CSV
         </button>
       </div>
     </div>
