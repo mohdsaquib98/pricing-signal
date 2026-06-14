@@ -28,8 +28,7 @@ The competitor is pricing at ₹${data.competitorPrice}, which is below our marg
 Provide a brief strategic recommendation for this situation. Do NOT recommend pricing below ₹${data.marginFloor}.
 Suggest alternative strategies (e.g., bundle offers, value positioning, wait for competitor price increase).
 
-Reply in this exact JSON format:
-{"recommendedPrice": <number - must be >= ${data.marginFloor}>, "reasoning": "<1-2 sentence explanation>", "marginImpact": "<1 sentence about margin trade-off>"}`
+If you recommend a price change, clearly state the new price with the ₹ symbol (e.g., "Recommend ₹1200").`
   }
 
   if (category === 'immediate') {
@@ -49,8 +48,7 @@ RULES:
 3. Balance competitiveness with margin preservation
 4. Be specific with the exact price
 
-Reply in this exact JSON format:
-{"recommendedPrice": <number - must be >= ${data.marginFloor} and ideally < ${data.competitorPrice}>, "reasoning": "<1-2 sentence specific explanation with actual numbers>", "marginImpact": "<1 sentence about margin trade-off with numbers>"}`
+Recommend a specific price with the ₹ symbol (e.g., "Recommend ₹1185").`
   }
 
   // Optimization
@@ -71,8 +69,7 @@ RULES:
 3. Maximize margin while keeping competitive edge
 4. Be specific with the exact price
 
-Reply in this exact JSON format:
-{"recommendedPrice": <number - must be >= ${data.marginFloor} and < ${data.competitorPrice}>, "reasoning": "<1-2 sentence specific explanation with actual numbers>", "marginImpact": "<1 sentence about margin improvement with numbers>"}`
+Recommend a specific price with the ₹ symbol (e.g., "Recommend ₹1350").`
 }
 
 export async function getRecommendation(

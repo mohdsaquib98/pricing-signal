@@ -19,32 +19,72 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
     onDataLoaded(sampleData)
   }
 
-  const handleParseJSON = () => {
+  const parseCSV = (csv: string): SKUData[] => {
+    const lines = csv.trim().split('\n')
+    if (lines.length < 2) throw new Error('CSV must have header and at least one data row')
+    
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+    const skuIdx = headers.indexOf('sku')
+    const brandIdx = headers.indexOf('brand')
+    const ourPriceIdx = headers.indexOf('ourprice')
+    const compPriceIdx = headers.indexOf('competitorprice')
+    const buyBoxIdx = headers.indexOf('buyboxstatus')
+    const marginIdx = headers.indexOf('marginfloor')
+    const changedIdx = headers.indexOf('lastchanged')
+    
+    if (skuIdx === -1 || ourPriceIdx === -1 || compPriceIdx === -1 || marginIdx === -1) {
+      throw new Error('CSV must have columns: sku, ourPrice, competitorPrice, marginFloor')
+    }
+    
+    return lines.slice(1).map((line, i) => {
+      const cols = line.split(',').map(c => c.trim())
+      return {
+        sku: cols[skuIdx] || `SKU-${i + 1}`,
+        brand: brandIdx !== -1 ? cols[brandIdx] : 'Unknown',
+        ourPrice: Number(cols[ourPriceIdx]),
+        competitorPrice: Number(cols[compPriceIdx]),
+        buyBoxStatus: (buyBoxIdx !== -1 && cols[buyBoxIdx] === 'Won' ? 'Won' : 'Lost') as 'Won' | 'Lost',
+        marginFloor: Number(cols[marginIdx]),
+        lastChanged: changedIdx !== -1 ? cols[changedIdx] : 'Unknown',
+      }
+    })
+  }
+
+  const handleParseData = () => {
     try {
       setError('')
-      const parsed = JSON.parse(rawInput)
-      if (!Array.isArray(parsed)) {
-        setError('Input must be a JSON array of SKU objects.')
-        return
+      let parsed: SKUData[]
+      
+      // Try CSV first (if contains comma-separated values)
+      if (rawInput.includes(',') && rawInput.split('\n').length > 1) {
+        parsed = parseCSV(rawInput)
+      } else {
+        // Try JSON
+        const jsonData = JSON.parse(rawInput)
+        if (!Array.isArray(jsonData)) {
+          setError('Input must be a JSON array or CSV with headers.')
+          return
+        }
+        parsed = jsonData.map((item: Record<string, unknown>) => {
+          if (!item.sku || item.ourPrice === undefined || item.competitorPrice === undefined || item.marginFloor === undefined) {
+            throw new Error(`Missing required fields in item: ${JSON.stringify(item).slice(0, 80)}`)
+          }
+          return {
+            sku: String(item.sku),
+            brand: String(item.brand || 'Unknown'),
+            ourPrice: Number(item.ourPrice),
+            competitorPrice: Number(item.competitorPrice),
+            buyBoxStatus: (item.buyBoxStatus === 'Won' ? 'Won' : 'Lost') as 'Won' | 'Lost',
+            marginFloor: Number(item.marginFloor),
+            lastChanged: String(item.lastChanged || 'Unknown'),
+          }
+        })
       }
-      const validated: SKUData[] = parsed.map((item: Record<string, unknown>) => {
-        if (!item.sku || item.ourPrice === undefined || item.competitorPrice === undefined || item.marginFloor === undefined) {
-          throw new Error(`Missing required fields in item: ${JSON.stringify(item).slice(0, 80)}`)
-        }
-        return {
-          sku: String(item.sku),
-          brand: String(item.brand || 'Unknown'),
-          ourPrice: Number(item.ourPrice),
-          competitorPrice: Number(item.competitorPrice),
-          buyBoxStatus: (item.buyBoxStatus === 'Won' ? 'Won' : 'Lost') as 'Won' | 'Lost',
-          marginFloor: Number(item.marginFloor),
-          lastChanged: String(item.lastChanged || 'Unknown'),
-        }
-      })
-      onDataLoaded(validated)
+      
+      onDataLoaded(parsed)
       setShowInput(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid JSON input.')
+      setError(err instanceof Error ? err.message : 'Invalid input format.')
     }
   }
 
@@ -92,7 +132,7 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
   return (
     <div className="max-w-3xl mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Paste JSON Data</h2>
+        <h2 className="text-lg font-semibold text-foreground">Paste JSON or CSV Data</h2>
         <button onClick={() => setShowInput(false)} className="text-muted-foreground hover:text-foreground">
           <X className="w-5 h-5" />
         </button>
@@ -100,13 +140,13 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
       <textarea
         value={rawInput}
         onChange={e => setRawInput(e.target.value)}
-        placeholder={`Paste a JSON array, e.g.:\n${sampleJSON.slice(0, 300)}...`}
+        placeholder={`Paste JSON array or CSV with headers:\nsku,brand,ourPrice,competitorPrice,buyBoxStatus,marginFloor,lastChanged\nSKU-001,Brand A,1299,1199,Lost,1050,3 days ago`}
         className="w-full h-64 p-4 rounded-xl border border-border bg-white font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <div className="flex gap-3 mt-4">
         <button
-          onClick={handleParseJSON}
+          onClick={handleParseData}
           className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           Parse & Load
@@ -115,7 +155,7 @@ export function DataInput({ onDataLoaded, hasData }: DataInputProps) {
           onClick={() => { setRawInput(sampleJSON) }}
           className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-gray-50 transition-colors"
         >
-          Fill Sample Data
+          Fill Sample JSON
         </button>
       </div>
     </div>
